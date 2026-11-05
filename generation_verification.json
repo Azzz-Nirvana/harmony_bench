@@ -1,0 +1,20 @@
+{
+  "feature": {
+    "exit_code": 0,
+    "seconds": 1.28,
+    "tasks": 3
+  },
+  "defect": {
+    "exit_code": 0,
+    "seconds": 16.52,
+    "tasks": 236,
+    "valid_tasks": 236,
+    "gold_patch_restoration_passed": 236
+  },
+  "migration": {
+    "exit_code": 0,
+    "seconds": 8.39,
+    "tasks": 1,
+    "quality_review": "needs_revision"
+  }
+}

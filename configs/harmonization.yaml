@@ -1,0 +1,116 @@
+# ──────────────────────────────────────────────────────────
+# 鸿蒙化任务评测集构建流水线 — 全局配置
+# ──────────────────────────────────────────────────────────
+
+pipeline:
+  name: "harmonization-benchmark-pipeline"
+  version: "1.0.0"
+
+# ── 阶段一：项目分析 ──────────────────────────────────────
+stage1_project_analysis:
+  file_pairing:
+    # 四通道权重 (A目录 B文件名 C API特征 D测试)
+    channel_weights: { A: 0.35, B: 0.30, C: 0.25, D: 0.10 }
+    # Levenshtein 文件名相似度阈值
+    filename_similarity_threshold: 0.7
+    # 路径结构对齐得分
+    path_alignment_score: 0.8
+    # API 特征匹配所需最少共同 API 数
+    min_common_apis: 3
+  dependency_analysis:
+    # 鸿蒙化密度阈值 (Android特有API调用数 / 总LOC)
+    min_harmonization_density: 0.05
+
+# ── 阶段二：任务挖掘 ──────────────────────────────────────
+stage2_task_mining:
+  # 三通道检测
+  channels:
+    A_api_level:
+      enabled: true
+      confidence: high
+      source: "HomeTran API mapping library"
+    B_structure_level:
+      enabled: true
+      confidence: medium
+      source: "AST pattern matching"
+    C_semantic_level:
+      enabled: true
+      confidence: low
+      source: "LLM-assisted annotation"
+      # LLM标注配置
+      llm:
+        model: "deepseek-v4-pro"
+        max_tokens_per_file: 4096
+        temperature: 0.1
+  # 八维鸿蒙化类别 — 维度权重（用于评分）
+  dimension_weights:
+    D1_ui_layout: 1.0
+    D2_component_architecture: 2.5
+    D3_lifecycle: 1.5
+    D4_state_management: 2.0
+    D5_concurrency: 3.5          # 最高权重：Actor消息传递是最难的改造
+    D6_permission: 1.5
+    D7_file_sandbox: 1.2
+    D8_third_party_lib: 3.0
+  # L1/L2/L3 难度分级目标占比
+  level_distribution: { L1: 0.30, L2: 0.50, L3: 0.20 }
+  # 改造点评分权重
+  scoring:
+    w1_api_uncertainty: 0.30     # (1 - API映射置信度)
+    w2_structure_diff: 0.25      # AST 差异幅度
+    w3_cross_file_impact: 0.25  # 跨文件影响范围
+    w4_dimension_weight: 0.20    # 维度权重
+    min_score_threshold: 0.15    # 最低得分阈值
+  # 聚合规则
+  aggregation:
+    l1_max_changes_per_file: 3    # L1: 单文件 ≤3 个同维度改造点
+    l2_min_cross_file: 2          # L2: 至少跨2个文件
+    l3_min_files: 5               # L3: ≥5 文件
+    l3_triggers: ["D5_concurrency", "D8_third_party_lib"]
+    downgrade_d1_only: true       # 纯 D1(UI) 降级为 L1
+
+# ── 阶段三：任务打包 ──────────────────────────────────────
+stage3_task_packaging:
+  verification:
+    v1_build:
+      enabled: true
+      target_coverage: 1.0       # 100% 任务有编译验证
+    v2_unit_test:
+      enabled: true
+      target_coverage: 0.7       # ≥70% 任务有单元测试
+      # JUnit → hypium 翻译器配置
+      junit_translator:
+        enabled: true
+        fallback: "llm_generate" # 无测试时用 LLM 生成
+    v3_behavior:
+      enabled: true
+      target_coverage: 0.3       # ≥30% L3 任务有行为等价验证
+
+# ── 阶段四：质量审核 ──────────────────────────────────────
+stage4_quality_review:
+  thresholds:
+    solvability_pass_at_5: 0.1    # pass@5 > 10%
+    clarity_kappa: 0.6            # κ > 0.6
+    verification_validity: 1.0    # 100%
+    difficulty_variance: 0.05     # var > 0.05
+    min_tasks_per_dimension: 3    # 每维度 ≥3 个任务
+    golden_quality: 1.0           # golden 编译/测试 100%
+  human_review:
+    sample_rate: 0.2              # 20% 抽检
+    l3_forced: true               # L3 强制人工审核
+
+# ── HomeTran API 映射库路径 ───────────────────────────────
+hometran:
+  mapping_library_path: "./data/hometran_api_mapping.json"
+  # 预留：未覆盖 API 的自动发现
+  auto_discovery:
+    enabled: true
+    method: "doc_graph_gnn"       # QRS 2022 方法
+    llm_verify: true
+
+# ── 输出配置 ──────────────────────────────────────────────
+output:
+  task_dir: "./outputs/tasks"
+  report_dir: "./outputs/reports"
+  format: "json"
+  include_intermediate: true      # 保留中间产物便于调试
